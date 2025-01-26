@@ -48,9 +48,9 @@
 
 ### 载入插件
 
-1. 下载文件 `LyricsRoller.lua`
+1. 在**Release**列表中下载最新的文件 `LyricsRoller.lua`
 
-2. 在Aegisub中载入插件：（菜单）自动化 → 自动化 → 载入 → 选择`LyricsRoller.lua`
+2. 在**Aegisub**中载入插件：（菜单）自动化 → 自动化 → 载入 → 选择`LyricsRoller.lua`
 
     <details>
         <summary>图片演示</summary>
