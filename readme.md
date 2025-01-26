@@ -14,12 +14,9 @@
     | --------------------------------------------------- | -------------------------------------------------- |
     | <img src="img/result_prev.png" style="zoom:70%;" /> | <img src="img/result_now.png" style="zoom:70%;" /> |
 
-+ 视频效果演示 
-    <details>
-        <summary>展开</summary>
-        <video src="example/二度寝_lyrics_roller_preview.mp4" autoplay="false" weight="377" height="600" controls="controls"></video>
-    </details>
-    
++ 视频效果演示
+
+    https://github.com/user-attachments/assets/d689d208-b66d-488e-a678-5682f5c63efe
     
 + **示例**位于 `/example` 文件夹下，其包含以下文件：
 
@@ -157,13 +154,10 @@
 + 使用方式：正常在字幕行中加入 `\K` 等标签，并指定强调行的颜色为**主要颜色**即可
 
 + 视频效果演示（仅日语歌词有卡拉OK效果）
+  
+  https://github.com/user-attachments/assets/f505a33b-e40a-4a3c-b40a-1469cb47560e
 
-    <details>
-        <summary>展开</summary>
-        <video src="example/二度寝-karaok_lyrics_roller_preivew.mp4" autoplay="false" weight="377" height="600" controls="controls"></video>
-    </details>
-    
-    
+
 
 ### 单独指定对齐方式
 
@@ -175,7 +169,7 @@
   
     1. 指定特效名
     
-    <img src="img/align-1.png" style="zoom:70%;" />
+        <img src="img/align-1.png" style="zoom:70%;" />
     
     2. 默认中间对齐
     
@@ -183,7 +177,7 @@
     
     3. 生成效果
     
-        ![](align-3.png)
+        <img src="img/align-3.png" style="zoom:70%;" />
     
 
 ### 修改插件对话框中的默认值
@@ -194,4 +188,4 @@
 
 + 示例：参数名以及值的对应
 
-    ![parameter](img/parameter.png)
+    ![](img/parameter.png)
