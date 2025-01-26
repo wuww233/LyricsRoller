@@ -25,8 +25,6 @@
     + 二度寝_lyrics_roller.mp4（使用上述两个文件压制成的最终视频文件）
     + 二度寝-karaok.ass（卡拉OK示例的字幕文件）
     + 二度寝-karaok_lyrics_roller.mp4（卡拉OK字幕文件生成的最终视频文件）
-    + 二度寝_lyrics_roller_preview.mp4（用于readme预览）
-    + 二度寝-karaok_lyrics_roller_preview.mp4（用于readme预览）
 
 
 
@@ -57,11 +55,9 @@
     <details>
         <summary>图片演示</summary>
         <br>
-        <img src="img/use_step-1-1.png"/>
-        <br><p>
-        ↓
-        </p>
-        <img src="img/use_step-1-2.png"/>
+        <img src="img/use_step-1-1.png" style="zoom:70%;" />
+        <br><br>
+        <img src="img/use_step-1-2.png" style="zoom:70%;" />
     </details>
 
 ### 基本使用方式
