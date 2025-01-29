@@ -94,7 +94,7 @@ generate_config=
     {class="label",x=0,y=14,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=14,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    {class="checkbox",name="save_config",x=0,y=15,width=4,label="记忆本次输入的参数(会在插件所在的目录下生成 LyricsRoller_config.txt)",value=false},
+    {class="checkbox",name="save_config",x=0,y=15,width=4,label="记忆本次输入的参数(会在插件目录下生成 LyricsRoller_config.txt)",value=false},
 
 }
 
