@@ -10,16 +10,18 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.0";
-script_last_update_date = "2025/01/08";
+script_version = "1.1";
+script_last_update_date = "2025/01/29";
 
 include("karaskel.lua")
 include("unicode.lua")
 
+config_file = "automation/autoload/LyricsRoller_config.txt"
+
 all_macros = {
 	{
 		script_name = "生成",
-        script_description = "注释指定特效名的行 并生成效果";
+        script_description = "注释指定特效名的行 并生成效果",
 		entry = function(subs,sel) generate(subs, sel) end,
 		validation = false
 	},
@@ -91,6 +93,9 @@ generate_config=
 	{class="intedit",name="fade_in",x=2,y=13,value=0,min=0, hint="淡入显示滚动歌词的动画时长"},
     {class="label",x=0,y=14,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=14,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
+
+    {class="checkbox",name="save_config",x=0,y=15,width=4,label="记忆本次输入的参数(会在插件所在的目录下生成 LyricsRoller_config.txt)",value=false},
+
 }
 
 function cal_group_position(base_y, current_group, group_size_height, group_size_height_scale, configs, is_scale)  -- 计算所有组的位置
@@ -562,7 +567,7 @@ function lyrics_roller(subtitles, configs)
     
     -- 将处理后的行写入字幕文件中
     if #roller_lines == 0 then
-        aegisub.log(2,"没有可生成的行")
+        aegisub.log(2,"没有可生成的行\n")
     else
         lines_dealt = deal_with_time(styles, roller_lines, configs, bound)
         for _, line in ipairs(lines_dealt) do
@@ -608,26 +613,122 @@ function lyrics_roller_recover(subtitles, configs)
 
 end
 
+function table2str(tbl)
+    local result = "{"
+    for k, v in pairs(tbl) do
+        local key = type(k) == "string" and string.format("[%q]", k) or "[" .. k .. "]"
+        local value
+        if type(v) == "table" then
+            value = table2str(v)
+        elseif type(v) == "string" then
+            value = string.format("%q", v)
+        else
+            value = tostring(v)
+        end
+        result = result .. key .. "=" .. value .. ","
+    end
+    return result .. "}"
+end
+
+function save_config(config)
+    local file = io.open(config_file, "w+")
+    if file then
+        file:write("return " .. table2str(config))
+        file:close()
+        return true
+    else
+        return false
+    end
+end
+
+function load_config()
+    local file = io.open(config_file, "r")
+    local config = nil
+    if file then
+
+        local content = file:read("*a")  -- 读取整个文件
+        file:close()
+        
+        local result = load(content)
+        config = result()
+    end
+    return config
+end
+
+function change_config(config, change_config)
+    config[2].value = change_config["tag"]
+    config[5].value = change_config["bound_1x"]
+    config[6].value = change_config["bound_1y"]
+    config[8].value = change_config["bound_2x"]
+    config[9].value = change_config["bound_2y"]
+
+    config[13].value = change_config["color"]
+    config[15].value = change_config["position"]
+    config[17].value = change_config["scale"]
+    config[19].value = change_config["times"]
+
+    config[22].value = change_config["opacity"]
+    config[24].value = change_config["spacing"]
+    config[26].value = change_config["spacing_inner"]
+    config[28].value = change_config["align"]
+    config[30].value = change_config["fade_in"]
+    config[32].value = change_config["fade_out"]
+    config[33].value = change_config["save_config"]
+end
+
 function generate(subtitles, selected_lines)
 
-    local xres, yres = aegisub.video_size()
-    if xres ~= nil then
-        generate_config[8].value = xres
+    config = util.deep_copy(generate_config)
+    result = load_config()
+    if result ~= nil then
+        aegisub.log(3,"读取参数\n")
+        change_config(config, result)
+    else 
+        aegisub.log(3,"使用默认参数\n")
+        local xres, yres = aegisub.video_size()
+        if xres ~= nil then
+            config[8].value = xres
+        end
+        if yres ~= nil then
+            config[9].value = yres
+        end     
     end
-    if yres ~= nil then
-        generate_config[9].value = yres
+
+    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
+        {ok="ok", cancel="cancel"})
+
+    while btn == "reset to default" do
+        aegisub.log(3,"参数恢复默认\n")
+        os.remove(config_file)
+        config = util.deep_copy(generate_config)
+        local xres, yres = aegisub.video_size()
+        if xres ~= nil then
+            config[8].value = xres
+        end
+        if yres ~= nil then
+            config[9].value = yres
+        end     
+        
+        btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
+            {ok="ok", cancel="cancel"})
     end
-    btn,result = aegisub.dialog.display(generate_config,{"ok","cancel"})
     
-    if btn=="ok" then
+    if btn =="ok" then
+        if result.save_config == true then
+            if save_config(result) then
+                aegisub.log(3,"保存参数成功\n")
+            else
+                aegisub.log(3,"保存参数失败\n")
+            end
+        end
         lyrics_roller(subtitles,result)
     end
     aegisub.set_undo_point("滚动歌词生成")
 end
 
-
 function recover(subtitles, selected_lines)
-    btn,result = aegisub.dialog.display(recover_config,{"ok","cancel"})
+
+    btn,result = aegisub.dialog.display(recover_config)
     
     if btn=="ok" then
         lyrics_roller_recover(subtitles,result)
