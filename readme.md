@@ -28,11 +28,14 @@
     + 二度寝-karaok.ass（卡拉OK示例的字幕文件）
     + 二度寝-karaok_lyrics_roller.mp4（卡拉OK字幕文件生成的最终视频文件）
 
+❗ 所有图片和视频演示均为v1.0版本，新增功能请在[更新历史](#更新历史)查看
+
 
 
 ## 目录
 
 - [LyricsRoller](#lyricsroller)
+  - [更新历史](#更新历史)
   - [目录](#目录)
   - [使用方法](#使用方法)
     - [载入插件](#载入插件)
@@ -46,21 +49,48 @@
     - [修改插件对话框中的默认值](#修改插件对话框中的默认值)
 
 
+
+
+## 更新历史
+
++ v1.1
+    + 新增**保存输入参数**的功能
+        + 在对话框中勾选 **记忆本次输入的参数** 即可
+        + 点击 **reset to default **可恢复最初的默认参数
+        
+    + 现在可以通过**Enter键**和**Esc键**快捷选择对话框按钮的**ok**和**cancel**了
+    
+        <img src="img/update-v11.png" style="zoom:60%;" />
+    
++ v1.0
+
+
+
 ## 使用方法
 
 ### 载入插件
 
 1. 在**Release**列表中下载最新的文件 `LyricsRoller.lua`
 
-2. 在**Aegisub**中载入插件：（菜单）自动化 → 自动化 → 载入 → 选择`LyricsRoller.lua`
-
-    <details>
-        <summary>图片演示</summary>
-        <br>
-        <img src="img/use_step-1-1.png" style="zoom:70%;" />
-        <br><br>
-        <img src="img/use_step-1-2.png" style="zoom:70%;" />
-    </details>
+2. 在**Aegisub**中载入插件
+    + 方法一（**推荐**）：打开Aegisub的本地文件夹目录，进入子目录`Aegisub/automation/autoload`，将下载的文件 `LyricsRoller.lua` 放入此文件夹中
+    
+        <details>
+            <summary>图片示例</summary>
+            <br>
+            <p>比如我安装的Aegisub是在D盘的tool文件夹下，那么我应该将插件放在图示位置中：</p>
+            <img src="img/load-1.png" style="zoom:70%;" />
+        </details>
+        
+    + 方法二：（菜单）自动化 → 自动化 → 载入 → 选择`LyricsRoller.lua`
+    
+        <details>
+            <summary>图片演示</summary>
+            <br>
+            <img src="img/use_step-1-1.png" style="zoom:70%;" />
+            <br><br>
+            <img src="img/use_step-1-2.png" style="zoom:70%;" />
+        </details>
 
 ### 基本使用方式
 
@@ -182,7 +212,7 @@
 
 ### 修改插件对话框中的默认值
 
-+ 打开源文件`LyricsRoller.lua`，修改行57-110中，数组**generate_config**里对应属性的**value**即可
++ 打开源文件`LyricsRoller.lua`，修改数组**generate_config**里对应属性的**value**即可
 
     ❗ 显示范围的 **右下(x,y)** 无法通过此方式修改，因为其会自动获取视频的尺寸并设置为右下角的位置
 
