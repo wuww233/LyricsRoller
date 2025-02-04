@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.1";
-script_last_update_date = "2025/01/29";
+script_version = "1.1.1";
+script_last_update_date = "2025/02/04";
 
 include("karaskel.lua")
 include("unicode.lua")
@@ -354,9 +354,9 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 if group_index[i] == current_group - 1 and group_end_time[current_group-1] == group_start_time[current_group] then -- 强调组变为普通组
                     
                     if configs.color == "次要颜色" then -- 变色
-                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. styles[line.style].color2  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. styles[line.style].color1 .. "\\fsc\\alpha&" .. opacity_hex .. "&)")
+                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. styles[line.style].color2  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. styles[line.style].color1 .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
                     else
-                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\fsc\\alpha&" .. opacity_hex .. "&)")
+                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
                     end
                      else
                     line = line_add_effect(line, "\\alpha&" .. opacity_hex .. "&")
@@ -722,16 +722,19 @@ function generate(subtitles, selected_lines)
             end
         end
         lyrics_roller(subtitles,result)
+        aegisub.log(3,"生成结束\n")
     end
     aegisub.set_undo_point("滚动歌词生成")
 end
 
 function recover(subtitles, selected_lines)
 
-    btn,result = aegisub.dialog.display(recover_config)
+    btn,result = aegisub.dialog.display(recover_config,{"ok","cancel"},
+    {ok="ok", cancel="cancel"})
     
     if btn=="ok" then
         lyrics_roller_recover(subtitles,result)
+        aegisub.log(3,"复原成功\n")
     end
     aegisub.set_undo_point("滚动歌词复原")
 end
