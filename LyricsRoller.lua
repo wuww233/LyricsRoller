@@ -465,7 +465,7 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
     
 
                 if group_index[i] == current_group then     -- 强调组变回普通组
-                    line.text = line_text_scale[i]
+                    line.text = line_text[i]
                     y = y + group_bias[i] -- 计算组内偏移距离
                     line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
                 
