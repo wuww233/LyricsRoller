@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.1.1";
-script_last_update_date = "2025/02/04";
+script_version = "1.2.1";
+script_last_update_date = "2025/02/27";
 
 include("karaskel.lua")
 include("unicode.lua")
@@ -63,7 +63,7 @@ generate_config=
 	{class="label",x=0,y=5,label="强调组"},
 
 	{class="label",x=1,y=5,label="字体颜色"},
-	{class="dropdown",name="color",x=2,y=5,items={"主要颜色","次要颜色"},value="主要颜色", hint="强调组使用字体颜色中的主要颜色or次要颜色\n若要使用卡拉OK 请设为主要颜色"},
+	{class="dropdown",name="color",x=2,y=5,items={"主要颜色","次要颜色"},value="主要颜色", hint="强调组使用样式中的主要颜色or次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)"},
 
 	{class="label",x=1,y=6,label="位置比例(%)"},
 	{class="intedit",name="position",x=2,y=6,value=30, hint="强调组行顶的位置 相对于整个显示范围\n(最上面是0 最下面是1)", min=0,max=100},
@@ -77,24 +77,28 @@ generate_config=
 
 	{class="label",x=0,y=9,label="普通组"},
 
-	{class="label",x=1,y=9,label="不透明度(%)"},
-	{class="intedit",name="opacity",x=2,y=9,value=60,min=0,max=100},
+	{class="label",x=1,y=9,label="字体颜色"},
+	{class="dropdown",name="color_norm",x=2,y=9,items={"主要颜色","次要颜色"},value="主要颜色", hint="普通组使用样式中的主要颜色or次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)"},
 
-	{class="label",x=0,y=10,label="组间距"},
-	{class="intedit",name="spacing",x=2,y=10,value=40,min=0},
+	{class="label",x=1,y=10,label="不透明度(%)"},
+	{class="intedit",name="opacity",x=2,y=10,value=60,min=0,max=100},
+
+	{class="label",x=0,y=11,label="组间距"},
+	{class="intedit",name="spacing",x=2,y=11,value=40,min=0},
     
-	{class="label",x=0,y=11,label="组内间距"},
-	{class="intedit",name="spacing_inner",x=2,y=11,value=5,min=0},
+	{class="label",x=0,y=12,label="组内间距"},
+	{class="intedit",name="spacing_inner",x=2,y=12,value=5,min=0},
 
-	{class="label",x=0,y=12,label="默认字幕对齐"},
-	{class="dropdown",name="align",x=2,y=12,items={"左对齐","中间对齐","右对齐"},value="中间对齐", hint="在指定特效名后加入以下后缀可对此行设置特定对齐方式\n-l左对齐 -c中间对齐 -r右对齐"},
+	{class="label",x=0,y=13,label="默认字幕对齐"},
+	{class="dropdown",name="align",x=2,y=13,items={"左对齐","中间对齐","右对齐"},value="中间对齐", hint="在指定特效名后加入以下后缀可对此行设置特定对齐方式\n-l左对齐 -c中间对齐 -r右对齐"},
 	
-    {class="label",x=0,y=13,label="淡入时长(毫秒)"},
-	{class="intedit",name="fade_in",x=2,y=13,value=0,min=0, hint="淡入显示滚动歌词的动画时长"},
-    {class="label",x=0,y=14,label="淡出时长(毫秒)"},
-	{class="intedit",name="fade_out",x=2,y=14,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
+    {class="label",x=0,y=14,label="淡入时长(毫秒)"},
+	{class="intedit",name="fade_in",x=2,y=14,value=0,min=0, hint="淡入显示滚动歌词的动画时长"},
+    {class="label",x=0,y=15,label="淡出时长(毫秒)"},
+	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    {class="checkbox",name="save_config",x=0,y=15,width=4,label="记忆本次输入的参数(会在插件目录下生成 LyricsRoller_config.txt)",value=false},
+    {class="checkbox",name="karaok",x=0,y=16,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
+    {class="checkbox",name="save_config",x=0,y=17,width=4,label="记忆本次输入的参数", hint="会在插件目录下生成 LyricsRoller_config.txt",value=false},
 
 }
 
@@ -195,30 +199,39 @@ function deal_with_size(line, max_width, scale)
         local new_line = ""
         local text_line = 0 -- 行数
         local in_brace = false
+        local in_brace_string = ""
         for char in unicode.chars(line.text) do -- 遍历每一个字符
-            if char == "{" then in_brace = true end
-            if in_brace == true then 
-                new_line = new_line .. char
+            if char == "{" then
+                in_brace = true 
+                in_brace_string = in_brace_string .. char
+            elseif char == "}" then 
+                in_brace_string = in_brace_string .. char
+                in_brace = false 
             else
-                local new_line_temp = new_line .. char
-                width = aegisub.text_extents(line.styleref, clear_effect(new_line_temp))
-                width = width * scale / 100
-                if width>max_width then -- 超出一行
-                    if text_line == 0 then
-                        new_text = new_line
-                    else
-                        new_text = new_text.."\\N"..new_line
-                    end
-                    text_line = text_line+1
-                    new_line = char -- 进入新的一行
+                if in_brace == true then -- 特效内
+                    in_brace_string = in_brace_string .. char
                 else
-                new_line = new_line_temp  -- 仍在这一行
+                    local new_line_temp = new_line .. char
+                    width = aegisub.text_extents(line.styleref, clear_effect(new_line_temp))
+                    width = width * scale / 100
+                    if width>max_width then -- 超出一行
+                        if text_line == 0 then
+                            new_text = new_line
+                        else
+                            new_text = new_text .. "\\N" .. new_line
+                        end
+                        text_line = text_line + 1
+                        new_line = in_brace_string .. char -- 进入新的一行，且特效放在换行符后
+                        in_brace_string = ""
+                    else  -- 仍在这一行
+                        new_line = new_line .. in_brace_string .. char  -- 加入特效
+                        in_brace_string = ""   -- 清空特效
+                    end
                 end
             end
-            if char == "}" then in_brace = false end
         end
         if new_line ~= nil then
-            new_text = new_text.."\\N"..new_line    -- 最后一行
+            new_text = new_text.."\\N".. new_line    -- 最后一行
             text_line = text_line+1
         end
         
@@ -326,6 +339,29 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
     local last_time = 0
     group_start_time[group_cnt+1] = group_end_time[group_cnt]
 
+    local norm_color_pre_is1
+    local norm_color_ftr_is1
+    local emphasize_color_is1
+
+    if configs.karaok == true then
+        norm_color_pre_is1 = true
+        norm_color_ftr_is1 = false
+        emphasize_color_is1 = true
+    else
+        if configs.color_norm == "主要颜色" then
+            norm_color_pre_is1 = true
+            norm_color_ftr_is1 = true
+        else
+            norm_color_pre_is1 = false
+            norm_color_ftr_is1 = false
+        end
+
+        if configs.color == "主要颜色" then -- 变色
+            emphasize_color_is1 = true
+        else
+            emphasize_color_is1 = false
+        end
+    end
 
     -- 过程模拟：开始滚动
     for current_group = 1, group_cnt do   -- current_group: 当前强调显示的行
@@ -335,31 +371,34 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
             local line = util.deep_copy(roller_lines[i])
             local y = group_positon_y[group_index[i]]
 
+            local norm_color_pre
+            local norm_color_ftr
+            local emphasize_color
+            if norm_color_pre_is1 then norm_color_pre = styles[line.style].color1 else norm_color_pre = styles[line.style].color2 end
+            if norm_color_ftr_is1 then norm_color_ftr = styles[line.style].color1 else norm_color_ftr = styles[line.style].color2 end
+            if emphasize_color_is1 then emphasize_color = styles[line.style].color1 else emphasize_color = styles[line.style].color2 end
+
 
             if group_index[i] == current_group then     -- 普通组变为强调组
                 line.text = line_text_scale[i]
                 y = y + group_bias_scale[i] -- 计算组内偏移距离
-                local add_effect = "\\fsc" .. configs.scale -- 缩放
-                if configs.color == "次要颜色" then
-                    add_effect = add_effect .. "\\c" .. styles[line.style].color2   -- 变色
-                end
-                line = line_add_effect(line, "\\fsc100\\alpha&" .. opacity_hex .. "&\\t(" .. 0 .. "," .. configs.times .. "," .. add_effect .. "\\alpha&00" .. "&)")   -- 变不透明
+                line = line_add_effect(line, "\\c" .. norm_color_ftr .. "\\fsc100\\alpha&" .. opacity_hex .. "&\\t(" .. 0 .. "," .. configs.times .. ",\\c" .. emphasize_color .. "\\fsc" .. configs.scale .. "\\alpha&00" .. "&)")   -- 变不透明
             else    -- 普通组
                 line.text = line_text[i]
                 y = y + group_bias[i]
-                line.text = line.text:gsub("\\[kK][of]?", "") -- 去除非强调行的卡拉OK效果
-                line.text = line.text:gsub("{}", "") -- 去除非强调行的卡拉OK效果
+                line.text = line.text:gsub("\\[kK][of]?[0-9]*", "") -- 去除非强调行的卡拉OK效果
+                line.text = line.text:gsub("{}", "") -- 去除非强调行的空特效
                 
 
                 if group_index[i] == current_group - 1 and group_end_time[current_group-1] == group_start_time[current_group] then -- 强调组变为普通组
-                    
-                    if configs.color == "次要颜色" then -- 变色
-                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. styles[line.style].color2  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. styles[line.style].color1 .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
-                    else
-                        line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
-                    end
-                     else
+                    line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
+                else
                     line = line_add_effect(line, "\\alpha&" .. opacity_hex .. "&")
+                    if group_index[i] < current_group then
+                        line = line_add_effect(line, "\\c" .. norm_color_pre)
+                    else
+                        line = line_add_effect(line, "\\c" .. norm_color_ftr)
+                    end
                 end
 
                 -- line = line_add_effect(line, "\\t(0,".. configs.times .. ",\\alpha&" .. opacity_hex .. "&)")    -- 变透明
@@ -378,14 +417,22 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
             end
 
             -- 在显示范围内 或者 从显示范围内进入/离开
-            if not (y >= bound[2][2] or y + line_height[i] <= bound[1][2]) or not (last_y[i]  + line_height[i]>= bound[2][2] or last_y[i] <= bound[1][2]) then 
+            if (y <= bound[2][2] and y + line_height[i] >= bound[1][2]) or (last_y[i] <= bound[2][2] and last_y[i] + line_height[i] >= bound[1][2]) then 
 
                 local lines={}
               
-                if y + line_height[i] > bound[2][2] and y < bound[2][2] then    -- 下方
-                    lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
-                elseif y < bound[1][2] and y + line_height[i] > bound[1][2] then -- 上方
-                    lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                if y + line_height[i] >= bound[2][2] then    -- 下方
+                    if y <= bound[2][2] then
+                        lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                    else
+                        lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                    end
+                elseif y <= bound[1][2] then -- 上方
+                    if y + line_height[i] >= bound[1][2] then
+                        lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                    else
+                        lines = line_fade_out(line, last_y[i]+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                    end
                 else --内部
                     line = line_add_effect(line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
                     lines[1] = line
@@ -409,34 +456,58 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 local line = util.deep_copy(roller_lines[i])
                 local y = group_positon_y[group_index[i]]
 
+                local norm_color_pre
+                local norm_color_ftr
+                local emphasize_color
+                if norm_color_pre_is1 then norm_color_pre = styles[line.style].color1 else norm_color_pre = styles[line.style].color2 end
+                if norm_color_ftr_is1 then norm_color_ftr = styles[line.style].color1 else norm_color_ftr = styles[line.style].color2 end
+                if emphasize_color_is1 then emphasize_color = styles[line.style].color1 else emphasize_color = styles[line.style].color2 end
+    
 
                 if group_index[i] == current_group then     -- 强调组变回普通组
                     line.text = line_text_scale[i]
                     y = y + group_bias[i] -- 计算组内偏移距离
-                    line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\fsc\\alpha&" .. opacity_hex .. "&)")
-                    
+                    line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
+                
                 else    -- 普通组
                     line.text = line_text[i]
                     y = y + group_bias[i]
                     line = line_add_effect(line, "\\alpha&" .. opacity_hex .. "&")
+                    if group_index[i] < current_group then
+                        line = line_add_effect(line, "\\c" .. norm_color_pre)
+                    else
+                        line = line_add_effect(line, "\\c" .. norm_color_ftr)
+                    end
                 end
+                
+
+                line.text = line.text:gsub("\\[kK][of]?[0-9]*", "") -- 去除卡拉OK效果
+                line.text = line.text:gsub("{}", "") -- 去除空特效
 
                 line = line_add_effect(line, position_str[line.align])
                 line.start_time = group_end_time[current_group]
                 line.end_time = group_start_time[current_group+1]
 
                 -- 移动到对应位置
-                line = line_add_effect(line,"\\move(" .. position_x[line.align] .. "," .. last_y[i] .. "," .. position_x[line.align] .. "," .. y .. "," .. 0 .. "," .. configs.times .. "&)")
+                line = line_add_effect(line,"\\move(" .. position_x[line.align] .. "," .. last_y[i] .. "," .. position_x[line.align] .. "," .. y .. "," .. 0 .. "," .. configs.times .. ")")
 
-                -- 在显示范围内 或者 从显示范围内离开
-                if not (y >= bound[2][2] or ((y + line_height[i]) <= bound[1][2])) or not (last_y[i] >= bound[2][2] or ((last_y[i] + line_height[i]) <= bound[1][2])) then 
+                -- 在显示范围内 或者 从显示范围内进入/离开
+                if (y <= bound[2][2] and y + line_height[i] >= bound[1][2]) or (last_y[i] <= bound[2][2] and last_y[i] + line_height[i] >= bound[1][2]) then 
 
                     local lines={}
                 
-                    if y + line_height[i] > bound[2][2] then    -- 下方
-                        lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
-                    elseif y < bound[1][2] then -- 上方
-                        lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                    if y + line_height[i] >= bound[2][2] then    -- 下方
+                        if y <= bound[2][2] then
+                            lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                        else
+                            lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                        end
+                    elseif y <= bound[1][2] then -- 上方
+                        if y + line_height[i] >= bound[1][2] then
+                            lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                        else
+                            lines = line_fade_out(line, last_y[i]+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                        end
                     else --内部
                         line = line_add_effect(line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
                         lines[1] = line
@@ -667,13 +738,15 @@ function change_config(config, change_config)
     config[17].value = change_config["scale"]
     config[19].value = change_config["times"]
 
-    config[22].value = change_config["opacity"]
-    config[24].value = change_config["spacing"]
-    config[26].value = change_config["spacing_inner"]
-    config[28].value = change_config["align"]
-    config[30].value = change_config["fade_in"]
-    config[32].value = change_config["fade_out"]
-    config[33].value = change_config["save_config"]
+    config[22].value = change_config["color_norm"]
+    config[24].value = change_config["opacity"]
+    config[26].value = change_config["spacing"]
+    config[28].value = change_config["spacing_inner"]
+    config[30].value = change_config["align"]
+    config[32].value = change_config["fade_in"]
+    config[34].value = change_config["fade_out"]
+    config[35].value = change_config["karaok"]
+    config[36].value = change_config["save_config"]
 end
 
 function generate(subtitles, selected_lines)
@@ -723,6 +796,8 @@ function generate(subtitles, selected_lines)
         end
         lyrics_roller(subtitles,result)
         aegisub.log(3,"生成结束\n")
+    else
+        aegisub.log(3,"取消操作\n")
     end
     aegisub.set_undo_point("滚动歌词生成")
 end
@@ -735,6 +810,8 @@ function recover(subtitles, selected_lines)
     if btn=="ok" then
         lyrics_roller_recover(subtitles,result)
         aegisub.log(3,"复原成功\n")
+    else
+        aegisub.log(3,"取消操作\n")
     end
     aegisub.set_undo_point("滚动歌词复原")
 end
