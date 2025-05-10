@@ -16,7 +16,7 @@ script_last_update_date = "2025/02/27";
 include("karaskel.lua")
 include("unicode.lua")
 
-config_file = "automation/autoload/LyricsRoller_config.txt"
+config_file = "LyricsRoller_config.txt"
 
 all_macros = {
 	{
@@ -98,7 +98,7 @@ generate_config=
 	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
     {class="checkbox",name="karaok",x=0,y=16,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
-    {class="checkbox",name="save_config",x=0,y=17,width=4,label="记忆本次输入的参数", hint="会在插件目录下生成 LyricsRoller_config.txt",value=false},
+    {class="checkbox",name="save_config",x=0,y=17,width=4,label="记忆本次输入的参数", hint="会生成文件 LyricsRoller_config.txt",value=false},
 
 }
 
@@ -417,21 +417,21 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
             end
 
             -- 在显示范围内 或者 从显示范围内进入/离开
-            if (y <= bound[2][2] and y + line_height[i] >= bound[1][2]) or (last_y[i] <= bound[2][2] and last_y[i] + line_height[i] >= bound[1][2]) then 
+            if (y <= bound[2][2] and y + line_height_scale[i] >= bound[1][2]) or (last_y[i] <= bound[2][2] and last_y[i] + line_height_scale[i] >= bound[1][2]) then 
 
                 local lines={}
               
-                if y + line_height[i] >= bound[2][2] then    -- 下方
+                if y + line_height_scale[i] >= bound[2][2] then    -- 下方
                     if y <= bound[2][2] then
                         lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
                     else
                         lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false)
                     end
                 elseif y <= bound[1][2] then -- 上方
-                    if y + line_height[i] >= bound[1][2] then
-                        lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                    if y + line_height_scale[i] >= bound[1][2] then
+                        lines = line_fade_out(line, y+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
                     else
-                        lines = line_fade_out(line, last_y[i]+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                        lines = line_fade_out(line, last_y[i]+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
                     end
                 else --内部
                     line = line_add_effect(line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
