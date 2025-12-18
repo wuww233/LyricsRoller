@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.2.1";
-script_last_update_date = "2025/02/27";
+script_version = "1.2.2";
+script_last_update_date = "2025/12/18";
 
 include("karaskel.lua")
 include("unicode.lua")
