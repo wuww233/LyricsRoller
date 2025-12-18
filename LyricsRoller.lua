@@ -20,15 +20,15 @@ config_file = "LyricsRoller_config.txt"
 
 all_macros = {
 	{
-		script_name = "生成",
-        script_description = "注释指定特效名的行 并生成效果",
-		entry = function(subs,sel) generate(subs, sel) end,
-		validation = false
-	},
-	{
 		script_name = "复原",
 		script_description = "删除指定特效名生成的效果(包括行和样式)\n并取消原行的注释",
 		entry = function(subs,sel) recover(subs, sel) end,
+		validation = false
+	},
+	{
+		script_name = "生成",
+        script_description = "注释指定特效名的行 并生成效果",
+		entry = function(subs,sel) generate(subs, sel) end,
 		validation = false
 	},
 }
@@ -97,8 +97,9 @@ generate_config=
     {class="label",x=0,y=15,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    {class="checkbox",name="karaok",x=0,y=16,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
-    {class="checkbox",name="save_config",x=0,y=17,width=4,label="记忆本次输入的参数", hint="会生成文件 LyricsRoller_config.txt",value=false},
+    {class="checkbox",name="edge_fade",x=0,y=16,width=4,label="首末组字幕透明度渐变", hint="显示范围内的第一组和最后一组字幕会有透明度渐变效果\n取消后只做硬裁剪",value=true},
+    {class="checkbox",name="karaok",x=0,y=17,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
+    {class="checkbox",name="save_config",x=0,y=18,width=4,label="记忆本次输入的参数", hint="会生成文件 LyricsRoller_config.txt",value=false},
 
 }
 
@@ -145,37 +146,60 @@ function percent_to_hex(opacity)    -- 把百分比0-100的值按比例转为十
     return string.format("%02X",(100-opacity) * 255 / 100)
 end
 
-function line_fade_out(line, y_start, y_end, bound, position_y, opacity, is_up) -- 把一行字幕从y_start到y_end的不透明度从1渐变为0
+function line_fade_out(line, y_start, y_end, bound, position_y, opacity, is_up, enable_fade) -- 把一行字幕从y_start到y_end的不透明度从1渐变为0
     local parts = 10    -- 渐变10次
     local lines = {}
+    if not enable_fade then
+        -- aegisub.log(3,"不执行渐变\n")
+        local clipped_line = util.deep_copy(line)
+        clipped_line = line_add_effect(clipped_line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
+        lines[1] = clipped_line
+        return lines
+    end
 
-    local opacity_step = opacity / parts
+    if math.abs(y_end - y_start) < 0.001 then
+        local clipped_line = util.deep_copy(line)
+        clipped_line = line_add_effect(clipped_line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
+        lines[1] = clipped_line
+        return lines
+    end
+
+    local total_steps = math.max(parts,1)
     local y_step = (y_end-y_start)/(parts+1)  -- 11次变化才能渐变10次
-    local this_opacity = opacity
+    local function eased_opacity(step_index)
+        if step_index < 1 then step_index = 1 end
+        local t = (step_index - 1) / total_steps
+        if t > 1 then t = 1 end
+        local eased = math.cos(t * math.pi / 2)
+        if eased < 0 then eased = 0 end
+        return opacity * eased
+    end
+    local step_index = 0
 
-    -- TODO: 修改为平滑曲线的渐变
     if is_up then      -- 上方渐变
         
         for y = y_start, y_end, y_step do
             local this_line = util.deep_copy(line)
+            step_index = step_index + 1
 
             local y_bound = y
             if y == y_start then y_bound = bound[2][2] end  -- 最下方的一个clip
 
-            this_line = line_add_effect(this_line, "\\clip(" .. bound[1][1] .. "," .. y+y_step .. "," .. bound[2][1] .. "," .. y_bound .. ")\\alpha&" .. percent_to_hex(this_opacity) .. "&")
-            this_opacity = this_opacity - opacity_step
+            local fade_opacity = eased_opacity(step_index)
+            this_line = line_add_effect(this_line, "\\clip(" .. bound[1][1] .. "," .. y+y_step .. "," .. bound[2][1] .. "," .. y_bound .. ")\\alpha&" .. percent_to_hex(fade_opacity) .. "&")
             
             lines[#lines + 1] = this_line
         end
     else -- 下方渐变 
         for y = y_start, y_end, y_step do
             local this_line = util.deep_copy(line)
+            step_index = step_index + 1
 
             local y_bound = y
             if y == y_start then y_bound = bound[1][2] end  -- 最上方的一个clip
 
-            this_line = line_add_effect(this_line, "\\clip(" .. bound[1][1] .. "," .. y_bound .. "," .. bound[2][1] .. "," .. y+y_step .. ")\\alpha&" .. percent_to_hex(this_opacity) .. "&")
-            this_opacity = this_opacity - opacity_step
+            local fade_opacity = eased_opacity(step_index)
+            this_line = line_add_effect(this_line, "\\clip(" .. bound[1][1] .. "," .. y_bound .. "," .. bound[2][1] .. "," .. y+y_step .. ")\\alpha&" .. percent_to_hex(fade_opacity) .. "&")
 
             lines[#lines + 1] = this_line
         end
@@ -423,15 +447,15 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
               
                 if y + line_height_scale[i] >= bound[2][2] then    -- 下方
                     if y <= bound[2][2] then
-                        lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                        lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false, edge_fade_enabled)
                     else
-                        lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false)
+                        lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false, edge_fade_enabled)
                     end
                 elseif y <= bound[1][2] then -- 上方
                     if y + line_height_scale[i] >= bound[1][2] then
-                        lines = line_fade_out(line, y+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                        lines = line_fade_out(line, y+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true, edge_fade_enabled)
                     else
-                        lines = line_fade_out(line, last_y[i]+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
+                        lines = line_fade_out(line, last_y[i]+line_height_scale[i], bound[1][2], bound, position_x[line.align], configs.opacity,true, edge_fade_enabled)
                     end
                 else --内部
                     line = line_add_effect(line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
@@ -498,16 +522,16 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 
                     if y + line_height[i] >= bound[2][2] then    -- 下方
                         if y <= bound[2][2] then
-                            lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false)
-                        else
-                            lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false)
-                        end
-                    elseif y <= bound[1][2] then -- 上方
-                        if y + line_height[i] >= bound[1][2] then
-                            lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
-                        else
-                            lines = line_fade_out(line, last_y[i]+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true)
-                        end
+                        lines = line_fade_out(line, y, bound[2][2], bound, position_x[line.align], configs.opacity,false, edge_fade_enabled)
+                    else
+                        lines = line_fade_out(line, last_y[i], bound[2][2], bound, position_x[line.align], configs.opacity,false, edge_fade_enabled)
+                    end
+                elseif y <= bound[1][2] then -- 上方
+                    if y + line_height[i] >= bound[1][2] then
+                        lines = line_fade_out(line, y+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true, edge_fade_enabled)
+                    else
+                        lines = line_fade_out(line, last_y[i]+line_height[i], bound[1][2], bound, position_x[line.align], configs.opacity,true, edge_fade_enabled)
+                    end
                     else --内部
                         line = line_add_effect(line, "\\clip(" .. bound[1][1] .. "," .. bound[1][2] .. "," .. bound[2][1] .. "," .. bound[2][2] .. ")")
                         lines[1] = line
@@ -537,6 +561,8 @@ function lyrics_roller(subtitles, configs)
         {configs.bound_1x,configs.bound_1y},
         {configs.bound_2x,configs.bound_2y}
     }
+    -- 是否启用边缘渐变
+    local edge_fade_enabled = configs.edge_fade
     -- 存储满足条件的行
     local roller_lines = {}
     local new_styles = {}
@@ -745,8 +771,9 @@ function change_config(config, change_config)
     config[30].value = change_config["align"]
     config[32].value = change_config["fade_in"]
     config[34].value = change_config["fade_out"]
-    config[35].value = change_config["karaok"]
-    config[36].value = change_config["save_config"]
+    config[35].value = change_config["edge_fade"]
+    config[36].value = change_config["karaok"]
+    config[37].value = change_config["save_config"]
 end
 
 function generate(subtitles, selected_lines)
