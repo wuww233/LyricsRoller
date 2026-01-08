@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.2.2";
-script_last_update_date = "2025/12/18";
+script_version = "1.2.3";
+script_last_update_date = "2026/01/08";
 
 include("karaskel.lua")
 include("unicode.lua")
@@ -406,7 +406,7 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
             if group_index[i] == current_group then     -- 普通组变为强调组
                 line.text = line_text_scale[i]
                 y = y + group_bias_scale[i] -- 计算组内偏移距离
-                line = line_add_effect(line, "\\c" .. norm_color_ftr .. "\\fsc100\\alpha&" .. opacity_hex .. "&\\t(" .. 0 .. "," .. configs.times .. ",\\c" .. emphasize_color .. "\\fsc" .. configs.scale .. "\\alpha&00" .. "&)")   -- 变不透明
+                line = line_add_effect(line, "\\c" .. norm_color_ftr .. "\\fscx100\\fscy100\\alpha&" .. opacity_hex .. "&\\t(" .. 0 .. "," .. configs.times .. ",\\c" .. emphasize_color .. "\\fscx" .. configs.scale .. "\\fscy" .. configs.scale .. "\\alpha&00" .. "&)")   -- 变不透明
             else    -- 普通组
                 line.text = line_text[i]
                 y = y + group_bias[i]
@@ -415,7 +415,7 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 
 
                 if group_index[i] == current_group - 1 and group_end_time[current_group-1] == group_start_time[current_group] then -- 强调组变为普通组
-                    line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
+                    line = line_add_effect(line, "\\fscx" .. configs.scale .. "\\fscy" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fscx100\\fscy100\\alpha&" .. opacity_hex .. "&)")
                 else
                     line = line_add_effect(line, "\\alpha&" .. opacity_hex .. "&")
                     if group_index[i] < current_group then
@@ -491,7 +491,7 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 if group_index[i] == current_group then     -- 强调组变回普通组
                     line.text = line_text[i]
                     y = y + group_bias[i] -- 计算组内偏移距离
-                    line = line_add_effect(line, "\\fsc" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fsc100\\alpha&" .. opacity_hex .. "&)")
+                    line = line_add_effect(line, "\\fscx" .. configs.scale .. "\\fscy" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fscx100\\fscy100\\alpha&" .. opacity_hex .. "&)")
                 
                 else    -- 普通组
                     line.text = line_text[i]
