@@ -270,6 +270,7 @@ function deal_with_size(line, max_width, scale)
 end
 
 function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
+    local edge_fade_enabled = configs.edge_fade
     local group_end_time = {}
     local group_start_time = {}
     local group_cnt = 1
@@ -561,8 +562,6 @@ function lyrics_roller(subtitles, configs)
         {configs.bound_1x,configs.bound_1y},
         {configs.bound_2x,configs.bound_2y}
     }
-    -- 是否启用边缘渐变
-    local edge_fade_enabled = configs.edge_fade
     -- 存储满足条件的行
     local roller_lines = {}
     local new_styles = {}
