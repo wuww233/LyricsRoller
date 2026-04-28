@@ -97,7 +97,7 @@ generate_config=
     {class="label",x=0,y=15,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    -- todo: 1. 修改读取和写入文件配置，与界面配置同步 2. 增加自动获取音频结束时间的功能 3. 点击ok生成字幕时根据界面配置自动增加前后空字幕
+    -- todo: 1. 修改读取和写入文件配置，与界面配置同步 2. 增加自动获取音频结束时间的功能 3. 点击ok生成字幕时根据界面配置自动增加前后空字幕，字幕特效名以-auto结尾 4. 复原功能增加删除-auto结尾的前后空字幕
 	{class="label",x=0,y=16,label="延长显示时间"},
     {class="checkbox",name="auto_fill_st",x=1,y=16,width=1,label="提前开始自(hh:mm:ss)", hint="勾选则在第一组字幕前增加从指定时间开始的空字幕",value=true},
 	{class="edit",name="auto_fill_st_time",x=2,y=16,value="00:00:00", hint="指定字幕提前开始显示的时间(格式 [[hh:]mm:]ss)"},
