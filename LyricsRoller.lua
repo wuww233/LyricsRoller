@@ -20,15 +20,15 @@ config_file = "LyricsRoller_config.txt"
 
 all_macros = {
 	{
-		script_name = "复原",
-		script_description = "删除指定特效名生成的效果(包括行和样式)\n并取消原行的注释",
-		entry = function(subs,sel) recover(subs, sel) end,
-		validation = false
-	},
-	{
 		script_name = "生成",
         script_description = "注释指定特效名的行 并生成效果",
 		entry = function(subs,sel) generate(subs, sel) end,
+		validation = false
+	},
+	{
+		script_name = "复原",
+		script_description = "删除指定特效名生成的效果(包括行和样式)\n并取消原行的注释",
+		entry = function(subs,sel) recover(subs, sel) end,
 		validation = false
 	},
 }
@@ -97,9 +97,18 @@ generate_config=
     {class="label",x=0,y=15,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    {class="checkbox",name="edge_fade",x=0,y=16,width=4,label="首末组字幕透明度渐变", hint="显示范围内的第一组和最后一组字幕会有透明度渐变效果\n取消后只做硬裁剪",value=true},
-    {class="checkbox",name="karaok",x=0,y=17,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
-    {class="checkbox",name="save_config",x=0,y=18,width=4,label="记忆本次输入的参数", hint="会生成文件 LyricsRoller_config.txt",value=false},
+    -- todo: 1. 修改读取和写入文件配置，与界面配置同步 2. 增加自动获取音频结束时间的功能 3. 点击ok生成字幕时根据界面配置自动增加前后空字幕
+	{class="label",x=0,y=16,label="延长显示时间"},
+    {class="checkbox",name="auto_fill_st",x=1,y=16,width=1,label="提前开始自(hh:mm:ss)", hint="勾选则在第一组字幕前增加从指定时间开始的空字幕",value=true},
+	{class="edit",name="auto_fill_st_time",x=2,y=16,value="00:00:00", hint="指定字幕提前开始显示的时间(格式 [[hh:]mm:]ss)"},
+    
+    {class="checkbox",name="auto_fill_et",x=1,y=17,width=1,label="延后结束到(hh:mm:ss)", hint="勾选则在最后一组字幕后增加到指定时间的空字幕",value=true},
+	{class="edit",name="auto_fill_et_time",x=2,y=17,value="00:00:00", hint="指定字幕延后结束显示的时间(格式 [[hh:]mm:]ss)\n点击按钮[get end time]自动填充音频结束时间"},    -- 自动获取音频结束时间
+
+
+    {class="checkbox",name="edge_fade",x=0,y=18,width=4,label="首末组字幕透明度渐变", hint="显示范围内的第一组和最后一组字幕会有透明度渐变效果\n取消后只做硬裁剪",value=true},
+    {class="checkbox",name="karaok",x=0,y=19,width=4,label="卡拉OK模式型字体颜色", hint="勾选此选项会覆盖字体颜色的设置为以下颜色：\n强调组为次要颜色转主要颜色\n强调组上方普通组使用主要颜色 下方普通组使用次要颜色\n(改变样式中的字体颜色后需要重新生成才能应用颜色的修改)",value=false},
+    {class="checkbox",name="save_config",x=0,y=20,width=4,label="记忆本次输入的参数", hint="会生成文件 LyricsRoller_config.txt",value=false},
 
 }
 
@@ -770,6 +779,8 @@ function change_config(config, change_config)
     config[30].value = change_config["align"]
     config[32].value = change_config["fade_in"]
     config[34].value = change_config["fade_out"]
+
+    
     config[35].value = change_config["edge_fade"]
     config[36].value = change_config["karaok"]
     config[37].value = change_config["save_config"]
@@ -793,7 +804,7 @@ function generate(subtitles, selected_lines)
         end     
     end
 
-    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
+    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default", "get end time"},
         {ok="ok", cancel="cancel"})
 
     while btn == "reset to default" do
