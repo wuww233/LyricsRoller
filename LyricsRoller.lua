@@ -100,10 +100,10 @@ generate_config=
     -- todo: 1. 修改读取和写入文件配置，与界面配置同步 2. 点击ok生成字幕时根据界面配置自动增加前后空字幕，字幕特效名以-roller结尾
 	{class="label",x=0,y=16,label="延长显示时间"},
     {class="checkbox",name="auto_fill_st",x=1,y=16,width=1,label="提前开始自(hh:mm:ss)", hint="勾选则在第一组字幕前增加从指定时间开始的空字幕",value=true},
-	{class="edit",name="auto_fill_st_time",x=2,y=16,value="00:00:00", hint="指定字幕提前开始显示的时间\n格式 hh:mm:ss 其中hh和mm可省略"},
+	{class="edit",name="auto_fill_st_time",x=2,y=16,value="00:00:00", hint="指定字幕提前开始显示的时间\n格式 时:分:秒 前二者可省略"},
     
     {class="checkbox",name="auto_fill_et",x=1,y=17,width=1,label="延后结束到(hh:mm:ss)", hint="勾选则在最后一组字幕后增加到指定时间的空字幕",value=true},
-	{class="edit",name="auto_fill_et_time",x=2,y=17,value="99:59:59", hint="指定字幕延后结束显示的时间\n格式 hh:mm:ss 其中hh和mm可省略"},
+	{class="edit",name="auto_fill_et_time",x=2,y=17,value="99:59:59", hint="指定字幕延后结束显示的时间\n格式 时:分:秒 前二者可省略"},
 
 
     {class="checkbox",name="edge_fade",x=0,y=18,width=4,label="首末组字幕透明度渐变", hint="显示范围内的第一组和最后一组字幕会有透明度渐变效果\n取消后只做硬裁剪",value=true},
@@ -804,7 +804,7 @@ function generate(subtitles, selected_lines)
         end     
     end
 
-    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default", "get end time"},
+    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
         {ok="ok", cancel="cancel"})
 
     while btn == "reset to default" do
