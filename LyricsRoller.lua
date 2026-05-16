@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.2.3";
-script_last_update_date = "2026/01/08";
+script_version = "1.3.0";
+script_last_update_date = "2026/05/16";
 
 include("karaskel.lua")
 include("unicode.lua")
@@ -20,13 +20,13 @@ config_file = "LyricsRoller_config.txt"
 
 all_macros = {
 	{
-		script_name = "生成",
+		script_name = "1. 生成",
         script_description = "注释指定特效名的行 并生成效果",
 		entry = function(subs,sel) generate(subs, sel) end,
 		validation = false
 	},
 	{
-		script_name = "复原",
+		script_name = "2. 复原",
 		script_description = "删除指定特效名生成的效果(包括行和样式)\n并取消原行的注释",
 		entry = function(subs,sel) recover(subs, sel) end,
 		validation = false
@@ -97,7 +97,6 @@ generate_config=
     {class="label",x=0,y=15,label="淡出时长(毫秒)"},
 	{class="intedit",name="fade_out",x=2,y=15,value=0,min=0, hint="淡出显示滚动歌词的动画时长"},
 
-    -- todo: 1. 修改读取和写入文件配置，与界面配置同步 2. 点击ok生成字幕时根据界面配置自动增加前后空字幕，字幕特效名以-roller结尾
 	{class="label",x=0,y=16,label="延长显示时间"},
     {class="checkbox",name="auto_fill_st",x=1,y=16,width=1,label="提前开始自(hh:mm:ss)", hint="勾选则在第一组字幕前增加从指定时间开始的空字幕",value=true},
 	{class="edit",name="auto_fill_st_time",x=2,y=16,value="00:00:00", hint="指定字幕提前开始显示的时间\n格式 时:分:秒 前二者可省略"},
@@ -563,6 +562,13 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
     return subtitles_generate
 end
 
+function ms_to_time_str(ms)
+    local h = math.floor(ms / 3600000)
+    local m = math.floor((ms % 3600000) / 60000)
+    local s = math.floor((ms % 60000) / 1000)
+    local ms_remainder = ms % 1000
+    return string.format("%02d:%02d:%02d.%02d", h, m, s, math.floor(ms_remainder / 10))
+end
 
 function lyrics_roller(subtitles, configs)
     -- 设置指定的特效字符串
@@ -665,6 +671,49 @@ function lyrics_roller(subtitles, configs)
     -- 按开始时间排序
     table.sort(roller_lines, function(a, b) return a.start_time < b.start_time or (a.start_time == b.start_time and a.index < b.index) end)   -- 默认以原来顺序排列
     
+    if #roller_lines >=1 then
+
+        -- 添加前置空字幕（提前开始）
+        if configs.auto_fill_st == true then
+            local start_ms = time_str_to_ms(configs.auto_fill_st_time)
+            local first_start_ms = roller_lines[1].start_time
+            if start_ms == -1 then
+                aegisub.log(2,"提前开始时间的格式错误，添加失败\n")
+            elseif start_ms < first_start_ms then
+                local empty_line = util.deep_copy(roller_lines[1]) -- 复制带有完整字段的现成行
+                empty_line.text = ""
+                empty_line.effect = target_effect .. "-st-roller"
+                empty_line.start_time = start_ms
+                empty_line.end_time = first_start_ms
+                table.insert(roller_lines, 1, empty_line) -- 插入到第一行
+                aegisub.log(2,"已添加前置空字幕 " .. ms_to_time_str(start_ms) .. " ~ " .. ms_to_time_str(first_start_ms) .. "\n")
+            else
+                aegisub.log(2,"提前开始时间在首行开始时间之后，添加失败\n")
+            end
+        end
+        
+        -- 添加后置空字幕（延后结束）
+        if configs.auto_fill_et == true then
+            local end_ms = time_str_to_ms(configs.auto_fill_et_time)
+            local last_end_ms = roller_lines[#roller_lines].end_time
+            if end_ms == -1 then
+                aegisub.log(2,"延后结束时间的格式错误，添加失败\n")
+            elseif end_ms > last_end_ms then
+                local empty_line = util.deep_copy(roller_lines[#roller_lines]) -- 复制带有完整字段的现成行
+                empty_line.text = ""
+                empty_line.effect = target_effect .. "-ed-roller"
+                empty_line.start_time = last_end_ms
+                empty_line.end_time = end_ms
+                table.insert(roller_lines, empty_line) -- 插入到最后一行之后
+                aegisub.log(2,"已添加后置空字幕 " .. ms_to_time_str(last_end_ms) .. " ~ " .. ms_to_time_str(end_ms) .. "\n")
+            else
+                aegisub.log(2,"延后结束时间在末行结束时间之前，添加失败\n")
+            end
+        end
+
+    end
+
+
     
     for _, line in ipairs(new_styles) do
         subtitles.append(line)
@@ -674,10 +723,13 @@ function lyrics_roller(subtitles, configs)
     if #roller_lines == 0 then
         aegisub.log(2,"没有可生成的行\n")
     else
+
         lines_dealt = deal_with_time(styles, roller_lines, configs, bound)
+        
         for _, line in ipairs(lines_dealt) do
             subtitles.append(line)
         end
+        
     end
 
 end
@@ -746,6 +798,71 @@ function save_config(config)
     end
 end
 
+-- 将时间字符串转换为毫秒
+-- 支持格式: [[hh:]mm:]ss or [[hh:]mm:]ss.ms
+function time_str_to_ms(time_str)
+    if not time_str or time_str == "" then
+        return -1
+    end
+    
+    -- 将输入转换为字符串以处理可能的非字符串输入
+    time_str = tostring(time_str)
+    
+    local hours = 0
+    local minutes = 0
+    local seconds = 0
+    local milliseconds = 0
+    
+    -- 分离秒和毫秒部分
+    local sec_part, ms_part = time_str:match("([^.]+)%.?(.*)$")
+    if not sec_part then
+        return -1
+    end
+    
+    if ms_part and ms_part ~= "" then
+        milliseconds = tonumber(ms_part) or 0
+        -- 如果毫秒部分不足3位，需要补零
+        if #ms_part == 1 then
+            milliseconds = milliseconds * 100
+        elseif #ms_part == 2 then
+            milliseconds = milliseconds * 10
+        end
+    end
+    
+    -- 分离时、分、秒
+    local parts = {}
+    for part in sec_part:gmatch("[^:]+") do
+        table.insert(parts, tonumber(part) or 0)
+    end
+    
+    if #parts == 1 then
+        seconds = parts[1]
+    elseif #parts == 2 then
+        minutes = parts[1]
+        seconds = parts[2]
+    elseif #parts == 3 then
+        hours = parts[1]
+        minutes = parts[2]
+        seconds = parts[3]
+    end
+    
+    return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
+end
+
+
+
+function set_config_by_name(config, name, value)
+    for i = 1, #config do
+        local item = config[i]
+        if item.name and item.name == name then
+            item.value = value
+            return true
+        end
+    end
+    return false
+end
+    
+
 function load_config()
     local file = io.open(config_file, "r")
     local config = nil
@@ -760,30 +877,16 @@ function load_config()
     return config
 end
 
+
 function change_config(config, change_config)
-    config[2].value = change_config["tag"]
-    config[5].value = change_config["bound_1x"]
-    config[6].value = change_config["bound_1y"]
-    config[8].value = change_config["bound_2x"]
-    config[9].value = change_config["bound_2y"]
-
-    config[13].value = change_config["color"]
-    config[15].value = change_config["position"]
-    config[17].value = change_config["scale"]
-    config[19].value = change_config["times"]
-
-    config[22].value = change_config["color_norm"]
-    config[24].value = change_config["opacity"]
-    config[26].value = change_config["spacing"]
-    config[28].value = change_config["spacing_inner"]
-    config[30].value = change_config["align"]
-    config[32].value = change_config["fade_in"]
-    config[34].value = change_config["fade_out"]
-
-    
-    config[35].value = change_config["edge_fade"]
-    config[36].value = change_config["karaok"]
-    config[37].value = change_config["save_config"]
+    -- 遍历界面上的所有组件
+    for i = 1, #config do
+        local item = config[i]
+        -- 如果组件有 name 属性，且保存的配置里有对应的配置项，则动态赋值
+        if item.name and change_config[item.name] ~= nil then
+            item.value = change_config[item.name]
+        end
+    end
 end
 
 function generate(subtitles, selected_lines)
@@ -804,22 +907,30 @@ function generate(subtitles, selected_lines)
         end     
     end
 
-    btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
+    btn,result = aegisub.dialog.display(config,{"ok","cancel","恢复默认参数", "恢复默认延长显示时间"},
         {ok="ok", cancel="cancel"})
 
-    while btn == "reset to default" do
-        aegisub.log(3,"参数恢复默认\n")
-        os.remove(config_file)
-        config = util.deep_copy(generate_config)
-        local xres, yres = aegisub.video_size()
-        if xres ~= nil then
-            config[8].value = xres
+    while btn == "恢复默认参数" or btn == "恢复默认延长显示时间" do
+        if btn == "恢复默认延长显示时间" then
+                -- 设置延长显示时间: 提前开始自00:00:00 延后结束至99:59:59
+                set_config_by_name(config, "auto_fill_st_time", "00:00:00")
+                -- set_config_by_name(config, "auto_fill_st", true)
+                set_config_by_name(config, "auto_fill_et_time", "99:59:59")
+                -- set_config_by_name(config, "auto_fill_et", true)
+                aegisub.log(3,"参数恢复为默认延长显示时间\n")
+        else
+            aegisub.log(3,"参数恢复默认\n")
+            os.remove(config_file)
+            config = util.deep_copy(generate_config)
+            local xres, yres = aegisub.video_size()
+            if xres ~= nil then
+                config[8].value = xres
+            end
+            if yres ~= nil then
+                config[9].value = yres
+            end     
         end
-        if yres ~= nil then
-            config[9].value = yres
-        end     
-        
-        btn,result = aegisub.dialog.display(config,{"ok","cancel","reset to default"},
+        btn,result = aegisub.dialog.display(config,{"ok","cancel","恢复默认参数", "恢复默认延长显示时间"},
             {ok="ok", cancel="cancel"})
     end
     
