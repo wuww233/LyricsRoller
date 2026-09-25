@@ -220,61 +220,124 @@ function clear_effect(text)
     return text:gsub("{.-}","") -- 去除所有{}
 end
 
--- 计算在scale缩放下的行高、且自动换行
-function deal_with_size(line, max_width, scale)
-    local width, height = aegisub.text_extents(line.styleref, clear_effect(line.text))
+-- 不允许出现在行首的标点（行首禁则），出现时会强制并入上一个词/字符，不单独换行到下一行开头
+local line_start_forbidden = {
+    ["，"]=true,["。"]=true,["、"]=true,["；"]=true,["："]=true,["？"]=true,["！"]=true,
+    ["）"]=true,["】"]=true,["｝"]=true,["》"]=true,["〉"]=true,["」"]=true,["』"]=true,
+    ["’"]=true,["”"]=true,["～"]=true,["·"]=true,["…"]=true,
+    [","]=true,["."]=true,[";"]=true,[":"]=true,["?"]=true,["!"]=true,
+    [")"]=true,["]"]=true,["}"]=true,[">"]=true,
+}
 
-    local new_text = ""
-    width = width * scale / 100
-    if width > max_width then   -- 超过一行
+function is_word_char(char) -- 判断是否为英文单词内的字符（字母/数字/撇号），多字节字符（中文等）不会匹配
+    return char:match("^[%w']$") ~= nil
+end
 
-        local new_line = ""
-        local text_line = 0 -- 行数
-        local in_brace = false
-        local in_brace_string = ""
-        for char in unicode.chars(line.text) do -- 遍历每一个字符
-            if char == "{" then
-                in_brace = true 
-                in_brace_string = in_brace_string .. char
-            elseif char == "}" then 
-                in_brace_string = in_brace_string .. char
-                in_brace = false 
+-- 把一行文本（保留{}特效标签）切分为不可再拆的"词"token序列
+-- 每个token: {text=内容, effect=附着在token前的特效字符串}
+-- 连续的英文单词字符会合并为一个词、连续空格会合并为一个token，换行只会发生在token之间
+function tokenize_text(text)
+    local tokens = {}
+    local in_brace = false
+    local pending_effect = ""
+
+    local function char_class(char)
+        if char == " " or char == "\t" then return "space" end
+        if char == "-" then return "hyphen" end
+        if is_word_char(char) then return "word" end
+        return "other"
+    end
+
+    for char in unicode.chars(text) do -- 遍历每一个字符
+        if char == "{" then
+            in_brace = true
+            pending_effect = pending_effect .. char
+        elseif char == "}" then
+            pending_effect = pending_effect .. char
+            in_brace = false
+        elseif in_brace then
+            pending_effect = pending_effect .. char
+        else
+            local class = char_class(char)
+            local last = tokens[#tokens]
+            if last and pending_effect == "" and last.class == class and (class == "word" or class == "space") then
+                last.text = last.text .. char -- 合并连续的单词字符或连续的空格
             else
-                if in_brace == true then -- 特效内
-                    in_brace_string = in_brace_string .. char
-                else
-                    local new_line_temp = new_line .. char
-                    width = aegisub.text_extents(line.styleref, clear_effect(new_line_temp))
-                    width = width * scale / 100
-                    if width>max_width then -- 超出一行
-                        if text_line == 0 then
-                            new_text = new_line
-                        else
-                            new_text = new_text .. "\\N" .. new_line
-                        end
-                        text_line = text_line + 1
-                        new_line = in_brace_string .. char -- 进入新的一行，且特效放在换行符后
-                        in_brace_string = ""
-                    else  -- 仍在这一行
-                        new_line = new_line .. in_brace_string .. char  -- 加入特效
-                        in_brace_string = ""   -- 清空特效
-                    end
-                end
+                -- 连字符、行首禁则标点 不允许单独出现在行首，会在下面并入前一个token
+                local no_line_start = (class == "hyphen") or (class == "other" and line_start_forbidden[char] == true)
+                table.insert(tokens, {text = char, effect = pending_effect, class = class, no_line_start = no_line_start})
+                pending_effect = ""
             end
         end
-        if new_line ~= nil then
-            new_text = new_text.."\\N".. new_line    -- 最后一行
-            text_line = text_line+1
-        end
-        
-        width, height = aegisub.text_extents(line.styleref, clear_effect(new_text))
-        height = text_line * height
-    else
-        new_text = line.text
     end
-    height = height * scale / 100
-    return height,new_text
-    
+
+    -- 把不允许出现在行首的token并入前一个token，确保换行只会发生在允许的位置
+    local fused = {}
+    for _, tok in ipairs(tokens) do
+        if tok.no_line_start and #fused > 0 then
+            local prev = fused[#fused]
+            prev.text = prev.text .. tok.effect .. tok.text
+        else
+            table.insert(fused, {text = tok.text, effect = tok.effect})
+        end
+    end
+
+    return fused
+end
+
+-- 计算在scale缩放下的行高、且自动换行
+-- 英文按单词/连字符处换行（不会拆散单词），中文仍按字换行；单词本身超过一行宽度时才逐字符拆开
+function deal_with_size(line, max_width, scale)
+    local clean_text = clear_effect(line.text)
+    local width, line_height = aegisub.text_extents(line.styleref, clean_text)
+    width = width * scale / 100
+
+    if width <= max_width then -- 不超过一行，无需换行
+        return line_height * scale / 100, line.text
+    end
+
+    local function text_width(str)
+        return aegisub.text_extents(line.styleref, clear_effect(str)) * scale / 100
+    end
+
+    local lines = {}
+
+    -- 单个token自身宽度就超过一行（例如超长的英文单词），逐字符拆开
+    local function split_long_token(effect, text)
+        local piece = effect
+        for char in unicode.chars(text) do
+            if piece ~= effect and text_width(piece .. char) > max_width then
+                table.insert(lines, piece)
+                piece = char
+            else
+                piece = piece .. char
+            end
+        end
+        return piece -- 未提交的最后一段，交给外层循环继续拼接
+    end
+
+    local cur_line = ""
+    for _, tok in ipairs(tokenize_text(line.text)) do
+        local candidate = cur_line .. tok.effect .. tok.text
+        if text_width(candidate) <= max_width then
+            cur_line = candidate
+        else
+            if cur_line ~= "" then
+                table.insert(lines, (cur_line:gsub("%s+$", ""))) -- 提交当前行，丢弃行尾多余空格
+            end
+            local single = tok.effect .. tok.text
+            if text_width(single) > max_width then
+                cur_line = split_long_token(tok.effect, tok.text)
+            else
+                cur_line = single
+            end
+        end
+    end
+    table.insert(lines, (cur_line:gsub("%s+$", "")))
+
+    local new_text = table.concat(lines, "\\N")
+    local height = #lines * line_height * scale / 100
+    return height, new_text
 end
 
 function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
