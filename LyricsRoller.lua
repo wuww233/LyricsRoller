@@ -10,8 +10,8 @@
 script_name = "LyricsRoller - 歌词滚动生成器"
 script_description = "把带有时间轴的多行字幕转换为类似音乐软件中歌词滚动的效果";
 script_author = "Jungezi";
-script_version = "1.4.0";
-script_last_update_date = "2026/09/26";
+script_version = "1.4.1";
+script_last_update_date = "2026/11/02";
 
 include("karaskel.lua")
 include("unicode.lua")
@@ -218,6 +218,100 @@ end
 
 function clear_effect(text)
     return text:gsub("{.-}","") -- 去除所有{}
+end
+
+local time_effects = {
+    t = true,
+    move = true,
+    fad = true,
+    fade = true,
+    k = true,
+    kf = true,
+    ko = true,
+    kt = true,
+}
+
+function remove_time_effects(text)
+    local function remove_from_block(block)
+        local result = {}
+        local i = 1
+
+        while i <= #block do
+            if block:sub(i, i) == "\\" then
+                local name_start = i + 1
+                local name_end = name_start
+                while block:sub(name_end, name_end):match("[A-Za-z]") do
+                    name_end = name_end + 1
+                end
+
+                if name_end > name_start then
+                    local name = block:sub(name_start, name_end - 1):lower()
+                    if time_effects[name] then
+                        i = name_end
+                        if name == "t" or name == "move" or name == "fad" or name == "fade" then
+                            while block:sub(i, i):match("%s") do
+                                i = i + 1
+                            end
+                            if block:sub(i, i) == "(" then
+                                local depth = 1
+                                i = i + 1
+                                while i <= #block and depth > 0 do
+                                    local char = block:sub(i, i)
+                                    if char == "(" then
+                                        depth = depth + 1
+                                    elseif char == ")" then
+                                        depth = depth - 1
+                                    end
+                                    i = i + 1
+                                end
+                            end
+                        else
+                            local parameter = block:sub(i):match("^[-+]?%d+%.?%d*")
+                            if parameter then
+                                i = i + #parameter
+                            end
+                        end
+                    else
+                        table.insert(result, block:sub(i, name_end - 1))
+                        i = name_end
+                    end
+                else
+                    table.insert(result, block:sub(i, i))
+                    i = i + 1
+                end
+            else
+                table.insert(result, block:sub(i, i))
+                i = i + 1
+            end
+        end
+
+        return table.concat(result)
+    end
+
+    local result = {}
+    local position = 1
+    while position <= #text do
+        local open = text:find("{", position, true)
+        if not open then
+            table.insert(result, text:sub(position))
+            break
+        end
+
+        table.insert(result, text:sub(position, open - 1))
+        local close = text:find("}", open + 1, true)
+        if not close then
+            table.insert(result, text:sub(open))
+            break
+        end
+
+        local block = remove_from_block(text:sub(open + 1, close - 1))
+        if block ~= "" then
+            table.insert(result, "{" .. block .. "}")
+        end
+        position = close + 1
+    end
+
+    return table.concat(result)
 end
 
 -- 不允许出现在行首的标点（行首禁则），出现时会强制并入上一个词/字符，不单独换行到下一行开头
@@ -481,9 +575,8 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                 line = line_add_effect(line, "\\c" .. norm_color_ftr .. "\\fscx100\\fscy100\\alpha&" .. opacity_hex .. "&\\t(" .. 0 .. "," .. configs.times .. ",\\c" .. emphasize_color .. "\\fscx" .. configs.scale .. "\\fscy" .. configs.scale .. "\\alpha&00" .. "&)")   -- 变不透明
             else    -- 普通组
                 line.text = line_text[i]
+                line.text = remove_time_effects(line.text)
                 y = y + group_bias[i]
-                line.text = line.text:gsub("\\[kK][of]?[0-9]*", "") -- 去除非强调行的卡拉OK效果
-                line.text = line.text:gsub("{}", "") -- 去除非强调行的空特效
                 
 
                 if group_index[i] == current_group - 1 and group_end_time[current_group-1] == group_start_time[current_group] then -- 强调组变为普通组
@@ -562,11 +655,13 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
 
                 if group_index[i] == current_group then     -- 强调组变回普通组
                     line.text = line_text[i]
+                    line.text = remove_time_effects(line.text)
                     y = y + group_bias[i] -- 计算组内偏移距离
                     line = line_add_effect(line, "\\fscx" .. configs.scale .. "\\fscy" .. configs.scale .. "\\c" .. emphasize_color  .. "\\t(" .. 0 .. "," .. configs.times .. "," .. "\\c" .. norm_color_pre .. "\\fscx100\\fscy100\\alpha&" .. opacity_hex .. "&)")
                 
                 else    -- 普通组
                     line.text = line_text[i]
+                    line.text = remove_time_effects(line.text)
                     y = y + group_bias[i]
                     line = line_add_effect(line, "\\alpha&" .. opacity_hex .. "&")
                     if group_index[i] < current_group then
@@ -576,9 +671,6 @@ function deal_with_time(styles, roller_lines, configs, bound, font_opacity)
                     end
                 end
                 
-
-                line.text = line.text:gsub("\\[kK][of]?[0-9]*", "") -- 去除卡拉OK效果
-                line.text = line.text:gsub("{}", "") -- 去除空特效
 
                 line = line_add_effect(line, position_str[line.align])
                 line.start_time = group_end_time[current_group]
